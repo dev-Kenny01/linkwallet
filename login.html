@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Access Account — Secure Asset Link</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1e40af',
+          },
+          fontFamily: {
+            sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-4px)' },
+            },
+            gentlePulse: {
+              '0%, 100%': { opacity: '0.8' },
+              '50%': { opacity: '1' },
+            }
+          },
+          animation: {
+            'float': 'float 4s ease-in-out infinite',
+            'gentle-pulse': 'gentlePulse 3s ease-in-out infinite',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-feature-settings: "liga", "clig", "kern";
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex items-center justify-center p-4 sm:p-6">
+  <div class="w-full max-w-md space-y-8">
+    <!-- Security Animation -->
+    <div class="flex justify-center">
+      <div class="relative">
+        <!-- Lock Icon -->
+        <div class="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white shadow-md animate-float">
+          <i class="fas fa-lock text-lg"></i>
+        </div>
+        <!-- Subtle outer glow (static) -->
+        <div class="absolute inset-0 w-14 h-14 rounded-full border border-primary border-opacity-20"></div>
+      </div>
+    </div>
+
+    <!-- Heading -->
+    <h2 class="text-2xl font-bold text-center text-slate-900">Enter Your Access ID</h2>
+
+    <!-- Input -->
+    <input
+      type="text"
+      id="accessIdInput"
+      inputmode="numeric"
+      placeholder="7–9 digit ID"
+      class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
+    />
+
+    <!-- Error -->
+    <p id="errorMessage" class="text-red-500 text-sm text-center min-h-[1.25rem]"></p>
+
+    <!-- Button -->
+    <button
+      id="continueBtn"
+      class="w-full py-3 bg-primary hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors duration-200"
+    >
+      Continue
+    </button>
+  </div>
+
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    // Credentials
+    const SUPABASE_URL = 'https://lchbeieopbkrpcrmxuiq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjaGJlaWVvcGJrcnBjcm14dWlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjUyNzcsImV4cCI6MjA4NDAwMTI3N30.Igf1ez9vmXGlNGPn-Yd-nbSA_og4yqyx-39jt64KypQ';
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const accessIdInput = document.getElementById('accessIdInput');
+    const errorMessage = document.getElementById('errorMessage');
+    const continueBtn = document.getElementById('continueBtn');
+
+    continueBtn.addEventListener('click', async () => {
+      const accessId = accessIdInput.value.trim();
+      errorMessage.textContent = '';
+
+      if (!/^\d{7,9}$/.test(accessId)) {
+        showError('Access ID must be 7–9 digits');
+        return;
+      }
+
+      try {
+        const { data, error } = await supabaseClient
+          .from('users')
+          .select('id')
+          .eq('access_id', accessId)
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            showError('Access ID not found');
+          } else {
+            console.error('Supabase error:', error);
+            showError('Network error. Please try again.');
+          }
+          return;
+        }
+
+        localStorage.setItem('hexawallet_access_id', accessId);
+        window.location.href = 'link.html';
+      } catch (err) {
+        console.error('Unexpected error:', err);
+        showError('Something went wrong. Please try again.');
+      }
+    });
+
+    function showError(msg) {
+      errorMessage.textContent = msg;
+    }
+  </script>
+</body>
+</html>
